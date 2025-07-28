@@ -26,7 +26,6 @@ class Server {
     listen() {
         this.app.listen(this.port, () => {
             console.log(`App escuchando en el puerto ${this.port}`);
-            console.log('API_KEY:', process.env.API_KEY);
         });
     }
 }
