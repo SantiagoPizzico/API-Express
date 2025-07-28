@@ -1,108 +1,66 @@
 const axios = require('axios');
-const { request, response} = require('express');
+const { request, response } = require('express');
 
 
-const getClimaCiudadID = async (req = request, res = response) => {
+const getClimaActualPorUbicacion = async (req = request, res = response) => {
     try {
-        const url = `https://api.openweathermap.org/data/2.5/weather`;
-        const id = req.query.ciudadID;
-        const respuesta = await axios.get(url, {params:{id: id, appid: process.env.API_KEY }},);
-        const datosClima = respuesta.data;
+        const { lat, lon } = req.query;
 
-        res.status(respuesta.status).json(datosClima);
-        console.log('respuesta exitosa con codigo:', respuesta.status)
-    } catch (error) {
-        console.error('Error:', error.message);
-        res.status(500).json({ error: 'error, asegurese de pasar bien los parametros' });
-    }
-};
+        if (!lat || !lon) {
+            return res.status(400).json({ error: "Debe proporcionar latitud y longitud" });
+        }
 
-
-const getClimaCiuad = async (req = request, res = response) => {
-    try {
-        const url = `https://api.openweathermap.org/data/2.5/weather`;
-        const ciudad = req.query.ciudad;
-        const respuesta = await axios.get(url, {
+        const oneCallUrl = "https://api.openweathermap.org/data/3.0/onecall";
+        const climaResponse = await axios.get(oneCallUrl, {
             params: {
-            q: ciudad,
-            appid: process.env.API_KEY,
-            lang:"es",
-            units: 'metric',
+                lat,
+                lon,
+                exclude: "minutely", // <--- Esto excluye el bloque minutely
+                appid: process.env.API_KEY,
+                lang: "es",
+                units: "metric",
             },
         });
-        const datosClima = respuesta.data;
 
-        const filteredData = {
-            weather: {
-                main: datosClima.weather[0].main,
-                description: datosClima.weather[0].description
-            },
-            main: {
-                temp: datosClima.main.temp,
-                feels_like: datosClima.main.feels_like,
-                humidity: datosClima.main.humidity
-            },
-            wind: {
-                speed: datosClima.wind.speed
-            },
-            name: datosClima.name,
-            cod: datosClima.cod
-        };
-        res.status(200).json(filteredData);
-        console.log('respuesta exitosa con codigo:', respuesta.status)
+        // Retorna toda la respuesta de OpenWeatherMap
+        res.status(200).json(climaResponse.data);
+        console.log("Clima completo consultado correctamente");
     } catch (error) {
-        console.error('Error:', error.message);
-        res.status(500).json({ error: 'error, asegurese de pasar bien los parametros' });
+        console.error("Error:", error.message);
+        if (error.response) {
+            res.status(error.response.status).json({ error: error.response.data });
+        } else {
+            res.status(500).json({ error: "Error interno al obtener el clima" });
+        }
     }
 };
 
 
-const getClimaSemanal = async (req = request, res = response) => {
+const getCiudadPorUbicacion = async (req = request, res = response) => {
     try {
-        const url = 'https://api.openweathermap.org/data/2.5/forecast';
-        const ciudad = req.query.ciudad;
-        const respuesta = await axios.get(url, {
-            params: {
-            q: ciudad,
-            cnt: 7,
-            appid: process.env.API_KEY,
-            lang:"es",
-            units: 'metric'
-            }
-        });
-        const datosClima = respuesta.data;
+        const { lat, lon } = req.query;
 
-        const filteredData = {
-            cod: datosClima.cod,
-            list: datosClima.list.slice(0, 7).map(item => ({
-                main: {
-                    temp_min: item.main.temp_min,
-                    temp_max: item.main.temp_max,
-                    humidity: item.main.humidity
-                },
-                weather: {
-                    main: item.weather[0].main,
-                    description: item.weather[0].description
-                },
-                wind: {
-                    speed: item.wind.speed
-                }
-            })),
-            city: {
-                name: datosClima.city.name
-            }
-        };
-        res.status(200).json(filteredData);
-        console.log('respuesta exitosa con codigo:', respuesta.status)
+        if (!lat || !lon) {
+            return res.status(400).json({ error: "Debe proporcionar latitud y longitud" });
+        }
+
+        // Usamos Nominatim (OpenStreetMap) para reverse geocoding
+        const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}`;
+        const geoResp = await axios.get(url, {
+            headers: { 'User-Agent': 'ExpressClimaApp' }
+        });
+
+        const address = geoResp.data.address || {};
+        const ciudad = address.city || address.town || address.village || address.state || geoResp.data.display_name;
+
+        res.status(200).json({ ciudad });
     } catch (error) {
-        console.error('Error:', error.message);
-        res.status(500).json({ error: 'error, asegurese de pasar bien los parametros' });
+        console.error("Error:", error.message);
+        res.status(500).json({ error: "Error al obtener el nombre de la ciudad" });
     }
 };
-
 
 module.exports = {
-    getClimaCiudadID,
-    getClimaCiuad,
-    getClimaSemanal
+    getClimaActualPorUbicacion,
+    getCiudadPorUbicacion
 };

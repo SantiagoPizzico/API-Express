@@ -18,7 +18,7 @@ class Server {
 
     routes() {
         this.app.use('/api/v1/clima', routes);
-        this.app.all('*', (res) => {
+        this.app.all('*', (req, res) => {
             res.status(404).json({ message: '404 Page Not Found' });
         });
     }
@@ -26,6 +26,7 @@ class Server {
     listen() {
         this.app.listen(this.port, () => {
             console.log(`App escuchando en el puerto ${this.port}`);
+            console.log('API_KEY:', process.env.API_KEY);
         });
     }
 }
